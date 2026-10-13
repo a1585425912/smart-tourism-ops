@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.resource.PathResourceResolver;
 
@@ -22,6 +23,13 @@ public class FrontendConfig implements WebMvcConfigurer {
 
     public FrontendConfig(@Value("${snow.frontend-dir:../frontend/dist}") String dir) {
         this.dist = Path.of(dir).toAbsolutePath().normalize();
+    }
+
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        if (Files.isRegularFile(dist.resolve("index.html"))) {
+            registry.addViewController("/").setViewName("forward:/index.html");
+        }
     }
 
     @Override

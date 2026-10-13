@@ -1,0 +1,55 @@
+# snow_world 容器编排: PostgreSQL/PostGIS + 应用(后端 API + 前端页面, 同一端口)
+# 启动: cp .env.example .env  (按需填写)  →  docker compose up -d --build
+# 访问: http://<主机>:${SNOW_PORT:-8080}   指挥大屏 /screen   移动巡检 /m
+services:
+  db:
+    image: ${POSTGIS_IMAGE:-postgis/postgis:17-3.5}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: snow_world
+      POSTGRES_USER: snow
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-snow_dev}
+      TZ: Asia/Shanghai
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snow -d snow_world"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # 不对外暴露数据库端口; 需要本机调试时取消下一行注释
+    # ports: ["55432:5432"]
+
+  app:
+    build:
+      context: .
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
+    image: snow-world:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${SNOW_PORT:-8080}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SNOW_DB_URL: jdbc:postgresql://db:5432/snow_world
+      SNOW_DB_USER: snow
+      SNOW_DB_PASSWORD: ${DB_PASSWORD:-snow_dev}
+      SNOW_DEMO_SEED: ${DEMO_SEED:-true}
+      SNOW_DEMO_REPLAY_AT: ${DEMO_REPLAY_AT:-2026-02-18T14:30:00+08:00}
+      SNOW_DEMO_PASSWORD: ${DEMO_PASSWORD:-Snow@2026demo}
+      SNOW_AI_PROVIDER: ${AI_PROVIDER:-fake}
+      DEEPSEEK_BASE_URL: ${AI_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_API_KEY: ${AI_API_KEY:-}
+      DEEPSEEK_MODEL: ${AI_MODEL:-deepseek-flash}
+    # 让容器能访问宿主机上的服务(例如本机的 OpenAI 兼容网关)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - storage:/app/storage
+
+volumes:
+  pgdata:
+  storage:

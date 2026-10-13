@@ -1,0 +1,10 @@
+**/node_modules
+**/target
+**/dist
+.git
+.worktrees
+runtime
+backend/config
+.env
+*.log
+_ref

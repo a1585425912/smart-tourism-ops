@@ -57,7 +57,7 @@ public final class AgentJson {
 
     public static String text(JsonNode node, String field) {
         JsonNode v = node == null ? null : node.get(field);
-        return v == null || v.isNull() || v.isContainerNode() ? null : v.asString();
+        return v == null || v.isNull() || v.isContainer() ? null : v.asString();
     }
 
     public static String truncate(String s, int max) {

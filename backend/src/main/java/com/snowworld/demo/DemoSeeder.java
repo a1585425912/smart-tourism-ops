@@ -14,6 +14,8 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 启动时按需生成演示数据(snow.demo.seed=true)。每个步骤幂等, 重启不会重复生成。 */
 @Component
@@ -26,8 +28,11 @@ public class DemoSeeder implements ApplicationRunner {
     private final JdbcClient jdbc;
     private final SnowProperties props;
     private final Clock clock;
+    private final TransactionTemplate tx;
 
-    public DemoSeeder(List<DemoSeedStep> steps, JdbcClient jdbc, SnowProperties props, Clock clock) {
+    public DemoSeeder(List<DemoSeedStep> steps, JdbcClient jdbc, SnowProperties props, Clock clock,
+                      PlatformTransactionManager txManager) {
+        this.tx = new TransactionTemplate(txManager);
         this.steps = steps.stream().sorted(Comparator.comparingInt(DemoSeedStep::order)).toList();
         this.jdbc = jdbc;
         this.props = props;
@@ -47,7 +52,16 @@ public class DemoSeeder implements ApplicationRunner {
                 continue;
             }
             long t0 = System.currentTimeMillis();
-            step.seed(ctx);
+            // 每个步骤一个事务: 中途失败整体回滚, 下次启动可重新生成
+            tx.executeWithoutResult(status -> {
+                try {
+                    step.seed(ctx);
+                } catch (RuntimeException e) {
+                    throw e;
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+            });
             log.info("演示数据 [{}] 生成完成, 用时 {} ms", step.name(), System.currentTimeMillis() - t0);
         }
     }

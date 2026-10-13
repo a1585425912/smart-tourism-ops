@@ -18,7 +18,7 @@ const versions = ref<ReportListItem[]>([])
 watch(r, async (v) => {
   if (!v) return
   try {
-    const page = await reportApi.list({ siteId: v.siteId, page: 1, size: 200 })
+    const page = await reportApi.list({ siteId: v.siteId, page: 1, size: 200, reportDate: v.reportDate })
     versions.value = page.items.filter((x) => x.reportDate === v.reportDate).sort((a, b) => b.version - a.version)
   } catch {
     versions.value = []
@@ -26,6 +26,7 @@ watch(r, async (v) => {
 })
 
 const KIND: Record<string, string> = { FACT: '事实', ANALYSIS: '分析', ADVICE: '建议' }
+const BASIS: Record<string, string> = { entries:'入园人次', exits:'出园人次', peak:'在园峰值', inPark:'在园人数', capacity:'承载量', revenue:'经营支付金额', orders:'经营订单', hotelOccupancy:'酒店入住率', groups:'预约及入园团队', groupVisitors:'团队游客', reviews:'当日网评', negativeReviews:'负面网评', rating:'平均评分', inspectionTasks:'新建巡检', inspectionCompleted:'当日任务完成', rectification:'整改及复核任务', closed:'开放状态' }
 const showSnapshot = ref(false)
 const snapshotText = computed(() => (r.value ? JSON.stringify(r.value.snapshot, null, 2) : ''))
 
@@ -87,11 +88,15 @@ function print() {
         </section>
 
         <section v-if="r.content.suggestions.length" class="sec advice">
-          <h2><span class="kind">建议</span>运营建议</h2>
+          <h2><span class="kind">行动</span>后续运营策略与行动计划</h2>
           <div v-for="(s, i) in r.content.suggestions" :key="i" class="sug">
             <b>{{ i + 1 }}. {{ s.title }}</b>
+            <div v-if="s.horizon || s.owner" class="meta">
+              <span v-if="s.horizon">执行时段：{{ s.horizon }}</span><span v-if="s.owner">责任岗位：{{ s.owner }}</span><span v-if="s.priority">优先级：{{ s.priority }}</span>
+            </div>
             <p>{{ s.detail }}</p>
-            <div v-if="s.basis.length" class="basis">依据：<code v-for="b in s.basis" :key="b">{{ b }}</code></div>
+            <p v-if="s.kpi" class="note">目标与复盘：{{ s.kpi }}</p>
+            <div v-if="s.basis.length" class="basis">依据：<code v-for="b in s.basis" :key="b">{{ BASIS[b] ?? b }}</code></div>
           </div>
           <p class="note">建议段由 AI 根据事实段生成，仅供参考，需由管理人员判断后执行。</p>
         </section>

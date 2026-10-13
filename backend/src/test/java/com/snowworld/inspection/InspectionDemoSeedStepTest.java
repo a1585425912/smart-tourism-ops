@@ -22,7 +22,7 @@ class InspectionDemoSeedStepTest extends InspectionTestSupport {
     Clock clock;
 
     private DemoSeedContext context() {
-        return new DemoSeedContext(jdbc, props, clock, new Random(42), OffsetDateTime.now(), LocalDate.parse("2024-01-01"));
+        return new DemoSeedContext(jdbc, props, clock, new Random(42), OffsetDateTime.now(), LocalDate.now(clock).minusDays(29));
     }
 
     private long count(String sql) {
@@ -58,6 +58,16 @@ class InspectionDemoSeedStepTest extends InspectionTestSupport {
         assertThat(count("SELECT count(*) FROM inspection_task")).isEqualTo(31);
         assertThat(count("SELECT count(DISTINCT status) FROM inspection_task")).isGreaterThanOrEqualTo(7);
         assertThat(count("SELECT count(*) FROM inspection_task WHERE origin = 'AGENT_DRAFT' AND status <> 'DRAFT'")).isZero();
+        step.seedScheduled(context());
+        assertThat(count("SELECT count(*) FROM inspection_task WHERE origin='SCHEDULE'")).isEqualTo(60);
+        assertThat(count("SELECT count(DISTINCT created_at::date) FROM inspection_task WHERE origin='SCHEDULE'")).isEqualTo(30);
+        step.seedScheduled(context());
+        assertThat(count("SELECT count(*) FROM inspection_task")).isEqualTo(91);
+        assertThat(count("""
+                SELECT count(*) FROM inspection_task t WHERE t.origin='SCHEDULE'
+                AND t.assignee_id IS NOT NULL
+                AND NOT EXISTS (SELECT 1 FROM user_scenic_scope s WHERE s.user_id=t.assignee_id AND s.site_id=t.site_id)
+                """)).isZero();
         // 状态与日志、异常保持一致
         assertThat(count("""
                 SELECT count(*) FROM inspection_task t WHERE t.status <> (

@@ -81,6 +81,40 @@ class AuthScopeIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    void screenDeviceAndReportListsExecuteValidSql() throws Exception {
+        jdbc.sql("""
+                INSERT INTO device (site_id, code, name, device_type, key_point, location, status, data_mode)
+                VALUES (?, 'A-CAM1', '重点摄像头', 'CAMERA', true,
+                        ST_SetSRID(ST_Point(126.60, 45.78), 4326), 'ONLINE', 'DEMO')
+                """).param(siteA).update();
+        MockHttpSession session = login("admin_a");
+        mvc.perform(get("/api/v1/devices").param("type", "CAMERA").param("keyPoint", "true").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].code").value("A-CAM1"));
+        mvc.perform(get("/api/v1/reports").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0));
+    }
+
+    @Test
+    void reportListCanShowLatestVersionsAndRetrieveAnOlderDate() throws Exception {
+        jdbc.sql("""
+                INSERT INTO operation_report(site_id,report_date,version,title,snapshot,content,data_as_of,data_mode,provider,created_by)
+                VALUES (?, '2025-11-01', 1, '旧版', '{}'::jsonb, '{}'::jsonb, now(), 'DEMO', 'fake',(SELECT id FROM app_user WHERE username='admin_a')),
+                       (?, '2025-11-01', 2, '行动计划', '{}'::jsonb, '{}'::jsonb, now(), 'DEMO', 'deepseek',(SELECT id FROM app_user WHERE username='admin_a'))
+                """).params(siteA,siteA).update();
+        MockHttpSession session=login("admin_a");
+        mvc.perform(get("/api/v1/reports").param("latestOnly","true").session(session))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.items[0].version").value(2));
+        mvc.perform(get("/api/v1/reports").param("reportDate","2025-11-01").session(session))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(2));
+        mvc.perform(get("/api/v1/reports").param("siteId",String.valueOf(siteB)).session(session))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void scopeRevocationTakesEffectImmediately() throws Exception {
         MockHttpSession session = login("admin_a");
         jdbc.sql("DELETE FROM user_scenic_scope").update();

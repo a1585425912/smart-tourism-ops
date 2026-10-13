@@ -6,12 +6,13 @@ import CountUp from './CountUp.vue'
 import { useScreen } from './screenContext'
 import { usePanel } from './usePanel'
 import { money, pct, perSite } from './screenData'
-import { mergeMode, sumNullable } from './screenUtils'
+import { addDays, mergeMode, sumNullable } from './screenUtils'
 
-/** 底部三个小面板: 业态经营(今日) / 旅行社团队(今日) / 巡检状态。 */
+/** 底部三个小面板: 业态经营(昨日完整业务日) / 旅行社团队(今日) / 巡检状态。 */
 const ctx = useScreen()
 
-const biz = usePanel(() => perSite(ctx.siteIds.value, (id) => screenApi.business(id, ctx.range.value.date, ctx.range.value.tomorrow)), [ctx.siteIds])
+const businessDate = computed(() => addDays(ctx.range.value.date, -1))
+const biz = usePanel(() => perSite(ctx.siteIds.value, (id) => screenApi.business(id, businessDate.value, ctx.range.value.date)), [ctx.siteIds])
 const grp = usePanel(() => perSite(ctx.siteIds.value, (id) => screenApi.groupStats(id, ctx.range.value.date, ctx.range.value.tomorrow)), [ctx.siteIds])
 watch(ctx.tick, () => { biz.reload(); grp.reload() }, { immediate: true })
 
@@ -58,7 +59,7 @@ const insp = computed(() => {
 </script>
 
 <template>
-  <ScreenPanel title="业态经营" sub="今日" :mode="bizMode" :loading="biz.loading.value" :error="biz.data.value ? null : biz.error.value"
+  <ScreenPanel title="业态经营" :sub="`昨日 ${businessDate.slice(5)}`" :mode="bizMode" :loading="biz.loading.value" :error="biz.data.value ? null : biz.error.value"
     :empty="!bizView.hasAny" empty-text="暂无业态数据" @retry="biz.reload">
     <div class="mini">
       <div class="big"><label>酒店入住率</label><b>{{ pct(bizView.occupancy, 1) }}</b></div>

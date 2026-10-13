@@ -2,7 +2,9 @@ package com.snowworld.inspection;
 
 import com.snowworld.demo.DemoSeedContext;
 import com.snowworld.demo.DemoSeedStep;
+import com.snowworld.demo.DemoFlowModel;
 import java.time.OffsetDateTime;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,6 +29,9 @@ public class InspectionDemoSeedStep implements DemoSeedStep {
     private static final Logger log = LoggerFactory.getLogger(InspectionDemoSeedStep.class);
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final DateTimeFormatter NO_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private final DemoFlowModel flowModel;
+
+    public InspectionDemoSeedStep(DemoFlowModel flowModel) { this.flowModel = flowModel; }
 
     /** 景区编码 -> 任务数量 */
     private static final Map<String, Integer> SITE_TASKS = Map.of("BXDSJ", 18, "TYD", 13, "ZYDJ", 9);
@@ -61,6 +66,9 @@ public class InspectionDemoSeedStep implements DemoSeedStep {
                     new String[]{"CAM_POWER", "线缆外皮被踩压破损", "HIGH", "已更换线缆并加装过线槽"}));
 
     private record Template(long id, String name, String category, List<String[]> items) {
+    }
+
+    private record Schedule(OffsetDateTime createdAt, OffsetDateTime dueAt, String key, String shift) {
     }
 
     @Override
@@ -113,16 +121,72 @@ public class InspectionDemoSeedStep implements DemoSeedStep {
                 Template template = templates.get(rnd.nextInt(templates.size()));
                 Map<String, Object> zone = zones.isEmpty() ? null : zones.get(rnd.nextInt(zones.size()));
                 seedTask(jdbc, rnd, now, seqByDate, siteId.get(), zone, template, scenario,
-                        inspectors.get(rnd.nextInt(inspectors.size())), reviewer, creator);
+                        inspectors.get(rnd.nextInt(inspectors.size())), reviewer, creator, null);
                 created++;
             }
         }
         log.info("生成巡检演示任务 {} 条", created);
     }
 
+    /** 指定历史范围每区域早晚两班；保留原有任务，幂等补充完整的计划巡检链路。 */
+    public void seedScheduled(DemoSeedContext ctx) {
+        JdbcClient jdbc = ctx.jdbc();
+        Random rnd = new Random(20260218L);
+        List<Template> templates = loadTemplates(jdbc);
+        if (templates.isEmpty()) return;
+        OffsetDateTime now = OffsetDateTime.now(ctx.clock());
+        Map<String, Integer> sequences = new HashMap<>();
+        int created = 0;
+        for (String code : SITE_ORDER) {
+            Optional<Long> site = jdbc.sql("SELECT id FROM scenic_site WHERE code = ?").param(code).query(Long.class).optional();
+            if (site.isEmpty()) continue;
+            List<Long> inspectors = jdbc.sql("""
+                    SELECT u.id FROM app_user u JOIN user_role r ON r.user_id = u.id
+                    WHERE r.role_code = 'INSPECTOR' AND u.status = 'ACTIVE'
+                      AND (u.all_sites OR EXISTS (SELECT 1 FROM user_scenic_scope s WHERE s.user_id=u.id AND s.site_id=?))
+                    ORDER BY u.id
+                    """).param(site.get()).query(Long.class).list();
+            if (inspectors.isEmpty()) continue;
+            Long creator = user(jdbc, SITE_ADMINS.getOrDefault(code, "admin")).orElse(null);
+            Long reviewer = user(jdbc, "reviewer").orElse(creator);
+            List<Map<String, Object>> zones = jdbc.sql("SELECT id, name FROM scenic_zone WHERE site_id=? AND active ORDER BY id")
+                    .param(site.get()).query().listOfRows();
+            int historyDays = (int) java.time.temporal.ChronoUnit.DAYS.between(ctx.historyFrom(), now.toLocalDate());
+            for (int back = historyDays; back >= 0; back--) {
+                LocalDate date = now.toLocalDate().minusDays(back);
+                for (Map<String, Object> zone : zones) {
+                    for (int shift = 0; shift < 2; shift++) {
+                        String key = "demo-schedule-v1:" + zone.get("id") + ":" + date + ":" + shift;
+                        if (jdbc.sql("SELECT EXISTS(SELECT 1 FROM inspection_task WHERE idempotency_key=?)")
+                                .param(key).query(Boolean.class).single()) continue;
+                        OffsetDateTime planned = date.atTime(shift == 0 ? 7 : 15, 0).atOffset(now.getOffset());
+                        boolean upcoming = planned.plusHours(2).isAfter(now);
+                        int draw = rnd.nextInt(100);
+                        String scenario = upcoming ? "ASSIGNED" : back > 3
+                                ? (draw < 88 ? "COMPLETED_CLEAN" : draw < 98 ? "COMPLETED_RECTIFIED" : "CANCELLED")
+                                : (draw < 70 ? "COMPLETED_CLEAN" : draw < 80 ? "COMPLETED_RECTIFIED"
+                                   : draw < 88 ? "SUBMITTED_ISSUE" : draw < 94 ? "RECTIFYING" : "PENDING_REVIEW");
+                        Schedule schedule = new Schedule(upcoming ? planned.minusHours(8) : planned,
+                                planned.plusHours(4), key, shift == 0 ? "早班" : "晚班");
+                        String zoneName = String.valueOf(zone.get("name"));
+                        List<Template> applicable = templates.stream().filter(t ->
+                                !"RIDE".equals(t.category()) && !"ICE_STRUCTURE".equals(t.category())
+                                || "BXDSJ".equals(code) && flowModel.inSeason(code,date)
+                                && ("ICE_STRUCTURE".equals(t.category()) || zoneName.contains("滑梯") || zoneName.contains("摩天轮"))).toList();
+                        if (applicable.isEmpty()) applicable=templates;
+                        seedTask(jdbc, rnd, now, sequences, site.get(), zone, applicable.get(rnd.nextInt(applicable.size())),
+                                scenario, inspectors.get(rnd.nextInt(inspectors.size())), reviewer, creator, schedule);
+                        created++;
+                    }
+                }
+            }
+        }
+        log.info("补充近 30 天区域早晚班巡检演示任务 {} 条", created);
+    }
+
     private void seedTask(JdbcClient jdbc, Random rnd, OffsetDateTime now, Map<String, Integer> seqByDate, long siteId,
                           Map<String, Object> zone, Template template, String scenario, long inspector,
-                          Long reviewer, Long creator) {
+                          Long reviewer, Long creator, Schedule schedule) {
         int daysAgo = switch (scenario) {
             case "COMPLETED_CLEAN", "COMPLETED_RECTIFIED" -> 1 + rnd.nextInt(10);
             case "PENDING_REVIEW", "RECTIFYING", "RECTIFYING_REJECTED" -> 1 + rnd.nextInt(4);
@@ -133,8 +197,9 @@ public class InspectionDemoSeedStep implements DemoSeedStep {
             default -> 0;
         };
         // 当天的任务步长较短, 保证所有时间点都不晚于业务当前时间
-        int maxStep = daysAgo == 0 ? 45 : 180;
-        OffsetDateTime[] cursor = {daysAgo == 0 ? now.minusHours(7) : now.minusDays(daysAgo).minusHours(rnd.nextInt(6))};
+        int maxStep = schedule != null ? 20 : daysAgo == 0 ? 45 : 180;
+        OffsetDateTime[] cursor = {schedule != null ? schedule.createdAt()
+                : daysAgo == 0 ? now.minusHours(7) : now.minusDays(daysAgo).minusHours(rnd.nextInt(6))};
         OffsetDateTime createdAt = cursor[0];
 
         boolean agentDraft = "AGENT_DRAFT".equals(scenario);
@@ -152,24 +217,29 @@ public class InspectionDemoSeedStep implements DemoSeedStep {
         boolean assigned = !"DRAFT".equals(finalStatus) && !("CANCELLED".equals(finalStatus) && rnd.nextBoolean());
         String zoneName = zone == null ? "" : zone.get("name") + " ";
         String title = agentDraft ? zoneName + "客流高峰时段秩序与防滑专项巡检" : zoneName + template.name();
+        if (schedule != null) title += "（" + schedule.shift() + "·演示）";
         String day = createdAt.format(NO_DATE);
+        if (schedule != null) seqByDate.computeIfAbsent(day, d -> jdbc.sql(
+                "SELECT coalesce(max(substring(task_no FROM 12)::int),0) FROM inspection_task WHERE task_no LIKE ?")
+                .param("XJ" + d + "-%").query(Integer.class).single());
         String taskNo = "XJ" + day + "-" + String.format("%04d", seqByDate.merge(day, 1, Integer::sum));
         String[] priorities = {"NORMAL", "NORMAL", "NORMAL", "HIGH", "LOW", "URGENT"};
 
         long taskId = jdbc.sql("""
                         INSERT INTO inspection_task (task_no, site_id, zone_id, template_id, title, description, priority,
-                            assignee_id, reviewer_id, due_at, status, origin, basis_refs, created_by, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?::jsonb, ?, ?, ?)
+                            assignee_id, reviewer_id, due_at, status, origin, basis_refs, created_by, created_at, updated_at, idempotency_key)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?::jsonb, ?, ?, ?, ?)
                         RETURNING id
                         """)
                 .params(taskNo, siteId, zone == null ? null : zone.get("id"), template.id(), title,
                         agentDraft ? "AI 运营助手根据区域客流预警与近期负面评价建议开展专项巡检，需人工确认后派发。"
                                 : "按日常巡检计划执行，发现异常请拍照并登记。",
                         priorities[rnd.nextInt(priorities.length)], assigned ? inspector : null,
-                        assigned ? reviewer : null, "DRAFT".equals(finalStatus) ? null : createdAt.plusHours(24),
-                        agentDraft ? "AGENT_DRAFT" : "MANUAL",
+                        assigned ? reviewer : null, schedule != null ? schedule.dueAt()
+                                : "DRAFT".equals(finalStatus) ? null : createdAt.plusHours(24),
+                        schedule != null ? "SCHEDULE" : agentDraft ? "AGENT_DRAFT" : "MANUAL",
                         agentDraft ? "[\"flow:zone-load\",\"review:summary\"]" : null,
-                        creator, createdAt, createdAt)
+                        creator, createdAt, createdAt, schedule == null ? null : schedule.key())
                 .query(Long.class).single();
 
         int version = 0;

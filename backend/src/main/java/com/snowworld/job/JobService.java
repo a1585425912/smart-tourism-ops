@@ -1,6 +1,9 @@
 package com.snowworld.job;
 
 import com.snowworld.common.ApiException;
+import com.snowworld.common.ClockConfig;
+import com.snowworld.common.SnowProperties;
+import java.time.Clock;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -65,9 +68,13 @@ public class JobService {
     @RestController
     public static class JobController {
         private final JobMapper mapper;
+        private final Clock clock;
+        private final SnowProperties props;
 
-        public JobController(JobMapper mapper) {
+        public JobController(JobMapper mapper, Clock clock, SnowProperties props) {
             this.mapper = mapper;
+            this.clock = clock;
+            this.props = props;
         }
 
         @GetMapping("/api/v1/jobs")
@@ -75,7 +82,7 @@ public class JobService {
         public List<JobMapper.JobRow> list(@RequestParam(required = false) String type,
                                            @RequestParam(required = false) String status,
                                            @RequestParam(defaultValue = "50") int limit) {
-            return mapper.list(type, status, Math.min(Math.max(limit, 1), 200));
+            return mapper.list(type, status, Math.min(Math.max(limit, 1), 200)).stream().map(this::view).toList();
         }
 
         @PostMapping("/api/v1/jobs/{id}/retry")
@@ -84,7 +91,18 @@ public class JobService {
             if (mapper.retry(id) == 0) {
                 throw ApiException.badRequest("只有失败的任务可以重试");
             }
-            return mapper.findById(id);
+            return view(mapper.findById(id));
+        }
+
+        private JobMapper.JobRow view(JobMapper.JobRow row) {
+            if (row == null || props.demo().replayAt() == null) return row;
+            row.setCreatedAt(ClockConfig.executionTime(row.getCreatedAt(), clock, true));
+            row.setUpdatedAt(ClockConfig.executionTime(row.getUpdatedAt(), clock, true));
+            row.setFinishedAt(ClockConfig.executionTime(row.getFinishedAt(), clock, true));
+            row.setHeartbeatAt(ClockConfig.executionTime(row.getHeartbeatAt(), clock, true));
+            row.setLeaseUntil(ClockConfig.executionTime(row.getLeaseUntil(), clock, true));
+            row.setRunAfter(ClockConfig.executionTime(row.getRunAfter(), clock, true));
+            return row;
         }
     }
 }

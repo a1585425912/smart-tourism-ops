@@ -24,11 +24,16 @@ public class FlowDemoSeedStep implements DemoSeedStep {
 
     @Override
     public boolean alreadySeeded(DemoSeedContext ctx) {
-        return ctx.jdbc().sql("SELECT EXISTS (SELECT 1 FROM flow_event WHERE data_mode = 'DEMO')").query(Boolean.class).single();
+        return ctx.jdbc().sql("SELECT EXISTS (SELECT 1 FROM integration_source WHERE code = ?)")
+                .param("flow-history-v2-" + ctx.historyFrom() + "-" + java.time.LocalDate.now(ctx.clock()))
+                .query(Boolean.class).single();
     }
 
     @Override
     public void seed(DemoSeedContext ctx) {
         feeder.sync(true, ctx.historyFrom());
+        feeder.syncDetails(ctx.historyFrom());
+        ctx.ensureSource("flow-history-v2-" + ctx.historyFrom() + "-" + java.time.LocalDate.now(ctx.clock()),
+                "完整历史回灌标记", "FLOW", null, "演示适配器", "非真实客流", null);
     }
 }

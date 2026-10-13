@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GlobalScopeView from '@/components/admin/GlobalScopeView.vue'
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { EChartsOption } from 'echarts'
@@ -87,7 +88,8 @@ const btBetter = computed(() => bt.value && bt.value.mape != null && bt.value.ba
 </script>
 
 <template>
-  <div class="sw-page">
+  <GlobalScopeView v-if="app.isGlobal" kind="forecasts" />
+  <div v-else class="sw-page">
     <div class="bar">
       <h2>客流预测与调度</h2>
       <el-radio-group v-model="days" size="small">

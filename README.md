@@ -27,6 +27,25 @@ docker compose up -d --build
 
 演示环境默认启用**回放时钟**：业务时间从 2026-02-18 14:30（春节假期、冰雪季）开始走时，界面顶部会显示“演示回放”。
 
+## 完整历史演示与本地网关
+
+`DEMO_HISTORY_FROM` 控制历史起点，`DEMO_REPLAY_AT` 控制当前业务时间。例如从 `2025-11-01` 起，回放到 `2026-10-13T21:43:00+08:00`，启动时会补齐三个景区的客流、区域热度、排队、逐日经营、旅行社团队、月度画像、游客评价及区域早晚班巡检。仿真遵守开放季、周末及节假日差异；闭园期间客流为零，保留维保巡检与合作酒店经营。生成步骤保留已有记录并按业务键避免重复。
+
+后台顶部可选“全局（全部授权景区）”查看跨景区数据，权限仍由服务端校验。运营日报列表默认展示每个景区每天的最新版本，详情保留历史版本；行动计划包含执行时段、责任岗位、资源安排、目标及复盘方法。
+
+使用宿主机已有 OpenAI 兼容网关时，在私有 `.env` 中设置 `AI_PROVIDER=deepseek`、`AI_BASE_URL=http://host.docker.internal:3000/v1`、`AI_API_KEY` 和实际 `AI_MODEL` 后重新创建应用容器。不要提交密钥。
+
+历史 AI 内容生成使用项目已有私有 `backend/config/application.yml` 中的 `snow.ai` 网关配置（宿主机可访问地址），需要 Python 和 PyYAML：
+
+```bash
+python -X utf8 scripts/data/complete_history_ai.py reviews
+python -X utf8 scripts/data/complete_history_ai.py reports
+python -X utf8 scripts/data/complete_history_ai.py marketing
+python -X utf8 scripts/data/complete_history_ai.py reports --refresh-current
+```
+
+此批处理面向 Docker 容器 `snowworld-db-1` 中 `.env` 的 `SNOW_DB_NAME` 演示库，历史起点为 `2025-11-01`，截止日期随当前业务回放时间；先启动并等待基础数据生成完成。模型结果缓存于被 Git 忽略的 `runtime/history-ai`，失败后重新执行对应阶段可继续完成；人工修正的评价不覆盖，日报保存新版本，营销方案保持内部草稿。最后一条命令按当前数据快照生成当日新版本，适合客流持续更新后重新制定行动计划。
+
 ## 功能与赛题对应
 
 | 赛题要求 | 实现 |
@@ -67,3 +86,5 @@ data/       开放数据：OSM 地图要素、哈尔滨逐日气象、法定节�
 scripts/    便携运行环境与启动脚本、OSM 数据抓取脚本
 docs/       需求、接口、部署、数据来源文档
 ```
+
+冬季展示使用独立快照库 `snow_world_showcase`，`.env` 设置 `SNOW_DB_NAME=snow_world_showcase` 并将 `DEMO_REPLAY_AT` 设在二月营业时段；后台、大屏、预测及任务展示共用业务回放时间。完整历史保留在 `snow_world`，切回该库并将回放日期设回十月即可恢复全年数据视图。任务执行租约仍使用真实运行时间，展示时间转换为业务时间。

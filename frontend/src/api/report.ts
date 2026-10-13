@@ -32,13 +32,13 @@ export interface Report extends ReportListItem {
     summary: string
     sections: { title: string; kind: 'FACT' | 'ANALYSIS' | 'ADVICE'; paragraphs: string[]; facts: ReportFact[] }[]
     risks: string[]
-    suggestions: { title: string; detail: string; basis: string[] }[]
+    suggestions: { title: string; detail: string; basis: string[]; owner?: string; horizon?: string; priority?: string; kpi?: string }[]
     coverage: string
   }
 }
 
 export const reportApi = {
-  list: (p: { siteId?: number; page?: number; size?: number } = {}) => get<Page<ReportListItem>>('/reports', p),
+  list: (p: { siteId?: number; page?: number; size?: number; latestOnly?: boolean; reportDate?: string } = {}) => get<Page<ReportListItem>>('/reports', p),
   get: (id: number) => get<Report>(`/reports/${id}`),
   generate: (siteId: number, reportDate: string) => post<{ runId: number }>('/reports', { siteId, reportDate }),
 }

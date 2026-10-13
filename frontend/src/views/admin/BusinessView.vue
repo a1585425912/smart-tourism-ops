@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GlobalScopeView from '@/components/admin/GlobalScopeView.vue'
 import { computed, ref } from 'vue'
 import type { EChartsOption } from 'echarts'
 import { opsApi, type BusinessCategory } from '@/api/ops'
@@ -76,7 +77,8 @@ function rText(r: number | null) {
 </script>
 
 <template>
-  <div class="sw-page">
+  <GlobalScopeView v-if="app.isGlobal" kind="business" />
+  <div v-else class="sw-page">
     <div class="bar">
       <h2>多业态经营</h2>
       <el-radio-group v-model="days" size="small">

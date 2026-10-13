@@ -436,6 +436,7 @@ public class AgentOrchestrator {
         row.setPromptVersion(Prompts.VERSION);
         row.setAgentRunId(s.run.getId());
         row.setCreatedBy(s.run.getUserId());
+        row.setCreatedAt(OffsetDateTime.now(clock));
         s.check();
         tx.executeWithoutResult(status -> {
             reportMapper.lock(siteId, day);
@@ -497,6 +498,7 @@ public class AgentOrchestrator {
         row.setContent(content);
         row.setAgentRunId(s.run.getId());
         row.setCreatedBy(s.run.getUserId());
+        row.setCreatedAt(OffsetDateTime.now(clock));
         s.check();
         marketingMapper.insert(row);
         ObjectNode result = AgentJson.object();

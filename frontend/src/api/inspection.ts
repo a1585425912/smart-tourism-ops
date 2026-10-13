@@ -126,7 +126,7 @@ export const inspectionApi = {
   transition: (id: number, body: TransitionBody) => post<TaskDetail>(`/inspection-tasks/${id}/transitions`, body),
   candidates: (siteId: number, role: 'INSPECTOR' | 'REVIEWER') =>
     get<{ id: number; displayName: string }[]>('/inspection/candidates', { siteId, role }),
-  stats: (siteId: number, start: string, end: string) => get<InspectionSummary>('/inspection/stats', { siteId, start, end }),
+  stats: (siteId: number | undefined, start: string, end: string) => get<InspectionSummary>('/inspection/stats', { siteId, start, end }),
   uploadFile: (file: File, siteId: number, bizType: string, bizId?: number, onProgress?: (p: number) => void) => {
     const form = new FormData()
     form.append('file', file)

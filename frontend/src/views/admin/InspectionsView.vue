@@ -29,19 +29,18 @@ const PRIORITY: Record<Priority, { n: string; type: string }> = {
 }
 
 const q = reactive({ status: '', mine: false, keyword: '', page: 1, size: 20 })
-const list = useAsync(async () => (siteId.value
-  ? inspectionApi.tasks({ siteId: siteId.value, status: q.status || undefined, mine: q.mine || undefined, keyword: q.keyword.trim() || undefined, page: q.page, size: q.size })
-  : null), [siteId, () => q.page, () => q.size])
+const list = useAsync(() => inspectionApi.tasks({ siteId: siteId.value ?? undefined, status: q.status || undefined,
+  mine: q.mine || undefined, keyword: q.keyword.trim() || undefined, page: q.page, size: q.size }), [siteId, () => q.page, () => q.size])
 function search() {
   if (q.page !== 1) q.page = 1
   else list.run()
 }
 watch(() => [q.status, q.mine], search)
+watch([siteId, () => q.size], search)
 
 const stats = useAsync(async () => {
-  if (!siteId.value) return null
   const r = dayRange(app.today(), 30)
-  return inspectionApi.stats(siteId.value, r.start, r.end)
+  return inspectionApi.stats(siteId.value ?? undefined, r.start, r.end)
 }, [siteId])
 
 // 新建任务
@@ -131,6 +130,7 @@ function rowClass({ row }: { row: TaskView }) {
       <StatePanel :loading="list.loading.value && !list.data.value" :error="list.error.value" :empty="!list.data.value?.items.length" empty-text="没有符合条件的巡检任务" @retry="list.run">
         <el-table :data="list.data.value?.items ?? []" size="small" :row-class-name="rowClass" @row-click="(r: TaskView) => router.push(`/admin/inspections/${r.id}`)">
           <el-table-column prop="taskNo" label="编号" width="150" />
+          <el-table-column v-if="app.isGlobal" prop="siteName" label="景区" min-width="140" />
           <el-table-column label="标题" min-width="200">
             <template #default="{ row }">
               {{ row.title }}

@@ -83,6 +83,9 @@ public class DeepSeekClient implements LlmClient {
         root.put("model", model);
         root.put("stream", false);
         root.put("temperature", 0.2);
+        if (model.toLowerCase(java.util.Locale.ROOT).contains("deepseek")) {
+            root.put("reasoning_effort", "low");
+        }
         if (request.maxTokens() > 0) {
             root.put("max_tokens", request.maxTokens());
         }

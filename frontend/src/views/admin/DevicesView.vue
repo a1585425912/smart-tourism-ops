@@ -18,9 +18,9 @@ const STATUS_TAG: Record<DeviceStatus, string> = { ONLINE: 'success', OFFLINE: '
 
 const filter = reactive<{ type: string; status: string; keyPoint: boolean }>({ type: '', status: '', keyPoint: false })
 
-const all = useAsync(async () => (siteId.value ? scenicApi.devices({ siteId: siteId.value }) : []), [siteId])
-const site = useAsync(async () => (siteId.value ? scenicApi.site(siteId.value) : null), [siteId])
-const zones = useAsync(async () => (siteId.value ? scenicApi.zones(siteId.value) : []), [siteId])
+const all = useAsync(() => scenicApi.devices({ siteId: siteId.value ?? undefined }), [siteId])
+const mapSites = useAsync(async () => siteId.value ? [await scenicApi.site(siteId.value)] : scenicApi.sites(), [siteId])
+const zones = useAsync(async () => (await Promise.all((siteId.value ? [siteId.value] : app.sites.map(s => s.id)).map(id => scenicApi.zones(id)))).flat(), [siteId])
 
 const devices = computed(() => (all.data.value ?? []).filter((d) =>
   (!filter.type || d.deviceType === filter.type) && (!filter.status || d.status === filter.status) && (!filter.keyPoint || d.keyPoint)))
@@ -67,7 +67,7 @@ function pick(id: number) {
           <span>点位分布</span>
           <span class="legend"><i class="g" />在线<i class="o" />离线<i class="r" />故障<i class="y" />未知</span>
         </div>
-        <SiteMap :sites="site.data.value ? [site.data.value] : []" :zones="zones.data.value ?? []" :devices="devices" :focus-site-id="siteId" :selected-device-id="selectedId" height="480px" @select-device="pick" />
+        <SiteMap :sites="mapSites.data.value ?? []" :zones="zones.data.value ?? []" :devices="devices" :focus-site-id="siteId" :selected-device-id="selectedId" height="480px" @select-device="pick" />
       </div>
 
       <div class="sw-card">

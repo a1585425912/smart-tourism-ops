@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GlobalScopeView from '@/components/admin/GlobalScopeView.vue'
 import { computed, ref } from 'vue'
 import type { EChartsOption } from 'echarts'
 import { opsApi, type ProfileDimension } from '@/api/ops'
@@ -58,7 +59,8 @@ function option(key: ProfileDimension, chart: 'bar' | 'pie'): EChartsOption | nu
 </script>
 
 <template>
-  <div class="sw-page">
+  <GlobalScopeView v-if="app.isGlobal" kind="profiles" />
+  <div v-else class="sw-page">
     <div class="bar">
       <h2>游客画像</h2>
       <el-date-picker v-model="month" type="month" value-format="YYYY-MM" size="small" :clearable="false" style="width: 140px" />

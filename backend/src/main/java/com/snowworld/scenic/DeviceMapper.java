@@ -42,7 +42,8 @@ public interface DeviceMapper {
 
     @Select("""
             <script>
-            SELECT """ + COLUMNS + """
+            SELECT
+            """ + COLUMNS + """
             FROM device d LEFT JOIN scenic_zone z ON z.id = d.zone_id
             WHERE d.site_id IN <foreach collection="siteIds" item="s" open="(" separator="," close=")">#{s}</foreach>
             <if test="type != null"> AND d.device_type = #{type}</if>

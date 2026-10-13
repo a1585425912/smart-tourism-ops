@@ -15,7 +15,7 @@ const router = useRouter()
 const siteId = computed(() => app.currentSite?.id ?? null)
 
 const q = reactive({ page: 1, size: 20 })
-const list = useAsync(() => reportApi.list({ siteId: siteId.value ?? undefined, page: q.page, size: q.size }), [siteId, () => q.page, () => q.size])
+const list = useAsync(() => reportApi.list({ siteId: siteId.value ?? undefined, page: q.page, size: q.size, latestOnly: true }), [siteId, () => q.page, () => q.size])
 watch(siteId, () => (q.page = 1))
 
 const dialog = ref(false)

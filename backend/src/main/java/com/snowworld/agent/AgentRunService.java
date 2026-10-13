@@ -6,6 +6,7 @@ import com.snowworld.auth.AuthUser;
 import com.snowworld.auth.Permission;
 import com.snowworld.auth.ScopeService;
 import com.snowworld.common.ApiException;
+import com.snowworld.common.ClockConfig;
 import com.snowworld.common.ErrorCode;
 import com.snowworld.common.PageResult;
 import com.snowworld.common.SnowProperties;
@@ -220,14 +221,18 @@ public class AgentRunService {
     List<StepView> steps(long runId, int afterSeq) {
         return mapper.toolCalls(runId, afterSeq).stream().map(t -> new StepView(t.getSeq(), t.getToolName(), t.getStatus(),
                 t.getArguments(), t.getResultSummary(), t.getSourceIds() == null ? List.of() : List.of(t.getSourceIds()),
-                t.getDurationMs(), t.getCreatedAt())).toList();
+                t.getDurationMs(), executionTime(t.getCreatedAt()))).toList();
     }
 
     RunView view(AgentRunMapper.RunRow r, boolean withSteps) {
         return new RunView(r.getId(), r.getScenario(), r.getStatus(), r.getProgress(), r.getInput(), r.getResult(),
                 r.getErrorCode(), r.getErrorMessage(), r.getProvider(), r.getModel(), r.getPromptVersion(), r.getModelCalls(),
-                r.getToolCalls(), r.getTokensIn(), r.getTokensOut(), r.getCreatedAt(), r.getStartedAt(), r.getFinishedAt(),
+                r.getToolCalls(), r.getTokensIn(), r.getTokensOut(), executionTime(r.getCreatedAt()), executionTime(r.getStartedAt()), executionTime(r.getFinishedAt()),
                 withSteps ? steps(r.getId(), 0) : List.of());
+    }
+
+    private OffsetDateTime executionTime(OffsetDateTime at) {
+        return ClockConfig.executionTime(at, clock, props.demo().replayAt() != null);
     }
 
     private static void require(AuthUser user, Permission permission) {

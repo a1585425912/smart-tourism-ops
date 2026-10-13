@@ -42,8 +42,8 @@ public interface MarketingMapper {
     PlanRow findById(long id);
 
     @Insert("""
-            INSERT INTO marketing_plan (title, site_ids, target_segment, content, agent_run_id, created_by)
-            VALUES (#{title}, #{siteIds}, #{targetSegment}, #{content}, #{agentRunId}, #{createdBy})
+            INSERT INTO marketing_plan (title, site_ids, target_segment, content, agent_run_id, created_by, created_at)
+            VALUES (#{title}, #{siteIds}, #{targetSegment}, #{content}, #{agentRunId}, #{createdBy}, coalesce(#{createdAt}, now()))
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
     void insert(PlanRow row);

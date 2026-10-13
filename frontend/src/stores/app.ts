@@ -28,7 +28,8 @@ export const useAppStore = defineStore('app', () => {
 
   const loggedIn = computed(() => me.value !== null)
   const sites = computed(() => me.value?.sites ?? [])
-  const currentSite = computed(() => sites.value.find((s) => s.id === currentSiteId.value) ?? sites.value[0] ?? null)
+  const isGlobal = computed(() => currentSiteId.value === 0)
+  const currentSite = computed(() => isGlobal.value ? null : sites.value.find((s) => s.id === currentSiteId.value) ?? sites.value[0] ?? null)
 
   function has(permission: string) {
     return me.value?.permissions.includes(permission) ?? false
@@ -57,7 +58,7 @@ export const useAppStore = defineStore('app', () => {
   async function loadMe() {
     try {
       me.value = await authApi.me()
-      if (!sites.value.some((s) => s.id === currentSiteId.value)) {
+      if (!isGlobal.value && !sites.value.some((s) => s.id === currentSiteId.value)) {
         selectSite(sites.value[0]?.id ?? null)
       }
     } catch {
@@ -71,7 +72,7 @@ export const useAppStore = defineStore('app', () => {
     me.value = await authApi.login(username, password)
     // 登录后会话 ID 变化, 重新获取 CSRF 令牌
     await ensureCsrf(true)
-    if (!sites.value.some((s) => s.id === currentSiteId.value)) {
+    if (!isGlobal.value && !sites.value.some((s) => s.id === currentSiteId.value)) {
       selectSite(sites.value[0]?.id ?? null)
     }
     return me.value
@@ -96,7 +97,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   return {
-    me, system, currentSiteId, currentSite, sites, loggedIn,
+    me, system, currentSiteId, currentSite, isGlobal, sites, loggedIn,
     has, hasRole, now, today, loadSystem, loadMe, login, logout, selectSite,
   }
 })

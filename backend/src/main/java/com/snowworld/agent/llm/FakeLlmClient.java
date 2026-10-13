@@ -461,7 +461,10 @@ public class FakeLlmClient implements LlmClient {
         String sites = ctx == null ? "" : ctx.path("sites").asString("");
         String goal = ctx == null ? "" : ctx.path("goal").asString("");
         ObjectNode out = AgentJson.object();
-        out.put("title", AgentJson.truncate("冰雪季联动套票方案草稿", 60));
+        String segment = ctx == null ? "" : ctx.path("segment").asString("");
+        String names = sites.replaceAll("\\([^)]*\\)", "").replace("哈尔滨", "");
+        out.put("title", AgentJson.truncate(names + "·" + (segment.isBlank() ? "多景区联游" : segment)
+                + "｜" + (goal.isBlank() ? "住宿餐饮联动方案" : goal), 90));
         ArrayNode segments = out.putArray("segments");
         F origin = top(facts, "profile.ORIGIN.");
         F age = top(facts, "profile.AGE.");

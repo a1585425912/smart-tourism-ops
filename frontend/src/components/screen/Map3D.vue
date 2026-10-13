@@ -16,6 +16,8 @@ const el = ref<HTMLDivElement>()
 let map: MlMap | null = null
 let ready = false
 let markers: Marker[] = []
+let labels: HTMLElement[] = []
+let labelFrame = 0
 let raf = 0
 let interacting = false
 let lastFocusKey = ''
@@ -97,6 +99,7 @@ function renderMarkers() {
   if (!map) return
   markers.forEach((mk) => mk.remove())
   markers = []
+  labels = []
   for (const cam of props.scene.cameras) {
     const node = document.createElement('div')
     node.className = 'sw-cam-marker' + (cam.status === 'ONLINE' ? '' : ' off')
@@ -108,13 +111,17 @@ function renderMarkers() {
     })
     markers.push(new Marker({ element: node }).setLngLat([cam.lon, cam.lat]).addTo(map))
   }
-  for (const q of props.scene.queues) {
+  for (const q of [...props.scene.queues].sort((a, b) =>
+    (b.measuredWaitMin ?? b.estimatedWaitMin ?? -1) - (a.measuredWaitMin ?? a.estimatedWaitMin ?? -1))) {
     const wait = q.measuredWaitMin ?? q.estimatedWaitMin
     const node = document.createElement('div')
     node.className = 'sw-queue-marker'
-    node.textContent = `${q.name} ${wait === null ? '—' : Math.round(wait) + '分'}`
-    node.title = q.measuredWaitMin !== null ? '实测排队时长' : '估算排队时长（排队人数/服务速率）'
-    markers.push(new Marker({ element: node, anchor: 'bottom' }).setLngLat([q.lon, q.lat]).addTo(map))
+    const label = document.createElement('span')
+    label.textContent = `${q.name} ${wait === null ? '—' : Math.round(wait) + '分'}`
+    node.append(label)
+    node.title = `${label.textContent}（${q.measuredWaitMin !== null ? '实测' : '估算'}）`
+    labels.push(label)
+    markers.push(new Marker({ element: node }).setLngLat([q.lon, q.lat]).addTo(map))
   }
   if (props.scene.showZoneLabels) {
     for (const f of props.scene.zones.features) {
@@ -129,8 +136,32 @@ function renderMarkers() {
       node.querySelector('em')!.textContent = ratio
       ;(node.querySelector('em') as HTMLElement).style.color = String(p.color)
       markers.push(new Marker({ element: node }).setLngLat(c).addTo(map))
+      labels.push(node)
     }
   }
+  scheduleLabels()
+}
+
+/** 按排队时长优先保留标签，避开其他标签和地图控件；点位始终保留。 */
+function layoutLabels() {
+  if (!el.value) return
+  const bounds = el.value.getBoundingClientRect()
+  const occupied = [...(el.value.parentElement?.querySelectorAll('.toolbar, .legend, .notes') ?? [])]
+    .map((node) => node.getBoundingClientRect())
+  for (const label of labels) {
+    const rect = label.getBoundingClientRect()
+    const outside = rect.left < bounds.left + 4 || rect.right > bounds.right - 4
+      || rect.top < bounds.top + 4 || rect.bottom > bounds.bottom - 4
+    const overlaps = occupied.some((r) => rect.left < r.right + 4 && rect.right > r.left - 4
+      && rect.top < r.bottom + 4 && rect.bottom > r.top - 4)
+    label.style.visibility = outside || overlaps ? 'hidden' : 'visible'
+    if (!outside && !overlaps) occupied.push(rect)
+  }
+}
+
+function scheduleLabels() {
+  cancelAnimationFrame(labelFrame)
+  labelFrame = requestAnimationFrame(layoutLabels)
 }
 
 function focus() {
@@ -172,6 +203,8 @@ onMounted(() => {
     return
   }
   map.on('error', (e) => console.warn('[map3d]', e.error?.message))
+  map.on('move', scheduleLabels)
+  map.on('resize', scheduleLabels)
   map.on('mousedown', () => (interacting = true))
   map.on('touchstart', () => (interacting = true))
   map.on('mouseup', () => (interacting = false))
@@ -196,6 +229,7 @@ watch(() => props.orbit, spin)
 
 onBeforeUnmount(() => {
   cancelAnimationFrame(raf)
+  cancelAnimationFrame(labelFrame)
   markers.forEach((m) => m.remove())
   map?.remove()
   map = null
@@ -216,7 +250,7 @@ onBeforeUnmount(() => {
 <style>
 /* Marker 节点由 MapLibre 挂载到地图容器内, 需使用全局样式 */
 .sw-cam-marker {
-  position: relative;
+  position: absolute;
   width: 14px;
   height: 14px;
   cursor: pointer;
@@ -248,6 +282,18 @@ onBeforeUnmount(() => {
   to { transform: scale(1.6); opacity: 0; }
 }
 .sw-queue-marker {
+  width: 10px;
+  height: 10px;
+  background: #b48cff;
+  border: 1px solid #efe4ff;
+  border-radius: 2px;
+  cursor: help;
+}
+.sw-queue-marker > span {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
   padding: 2px 6px;
   font-size: 12px;
   color: #efe4ff;

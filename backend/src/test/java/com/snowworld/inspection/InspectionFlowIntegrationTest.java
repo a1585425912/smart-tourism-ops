@@ -163,6 +163,24 @@ class InspectionFlowIntegrationTest extends InspectionTestSupport {
     }
 
     @Test
+    void operatorCanReadScopedTasksWithoutExecutionPrivileges() throws Exception {
+        createUser("operator_a", "OPERATOR", siteA);
+        MockHttpSession operator = login("operator_a");
+        JsonNode task = startedTask(login("admin_a"), login("insp1"));
+        long id = task.get("id").asLong();
+
+        JsonNode list = getJson(operator, "/api/v1/inspection-tasks?siteId=" + siteA, 200);
+        assertThat(list.get("total").asInt()).isEqualTo(1);
+        assertThat(list.get("items").get(0).get("id").asLong()).isEqualTo(id);
+        assertThat(actions(getJson(operator, "/api/v1/inspection-tasks/" + id, 200))).isEmpty();
+        assertThat(getJson(operator, "/api/v1/inspection-tasks?mine=true", 200).get("total").asInt()).isZero();
+        getJson(operator, "/api/v1/inspection-tasks?siteId=" + siteB, 403);
+        postJson(operator, "/api/v1/inspection-tasks/" + id + "/results",
+                "{\"version\":0,\"items\":[]}", 403);
+        transition(operator, id, "SUBMIT", task.get("version").asInt(), null, 403);
+    }
+
+    @Test
     void crossSiteAccessIsForbidden() throws Exception {
         MockHttpSession admin = login("admin_a");
         MockHttpSession adminB = login("admin_b");

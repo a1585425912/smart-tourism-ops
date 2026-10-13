@@ -13,6 +13,9 @@ const app = useAppStore()
 const canAi = computed(() => app.has('AI_USE'))
 
 const plans = useAsync(async () => asList(await agentApi.plans()))
+const visiblePlans = computed(() => (plans.data.value ?? [])
+  .filter(p => app.isGlobal || !app.currentSite || p.siteIds.includes(app.currentSite.id))
+  .slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id))
 const STATUS: Record<MarketingPlan['status'], { n: string; type: string }> = { DRAFT: { n: '草稿', type: 'info' }, APPROVED: { n: '已采纳', type: 'success' }, ARCHIVED: { n: '已归档', type: 'warning' } }
 const siteNames = (ids: number[]) => ids.map((id) => app.sites.find((s) => s.id === id)?.shortName ?? `#${id}`).join('、')
 
@@ -100,9 +103,9 @@ const GOALS = ['提升工作日客流，联动酒店与餐饮推出两日游套�
       <el-button v-if="canAi" type="primary" size="small" @click="openGen">AI 生成方案</el-button>
     </div>
 
-    <StatePanel :loading="plans.loading.value && !plans.data.value" :error="plans.error.value" :empty="!plans.data.value?.length" empty-text="还没有营销方案，可点击“AI 生成方案”" min-height="240px" @retry="plans.run">
+    <StatePanel :loading="plans.loading.value && !plans.data.value" :error="plans.error.value" :empty="!visiblePlans.length" empty-text="还没有营销方案，可点击“AI 生成方案”" min-height="240px" @retry="plans.run">
       <div class="cards">
-        <div v-for="p in plans.data.value" :key="p.id" class="sw-card plan" @click="open(p.id)">
+        <div v-for="p in visiblePlans" :key="p.id" class="sw-card plan" @click="open(p.id)">
           <div class="pt"><b>{{ p.title }}</b><el-tag size="small" :type="STATUS[p.status].type">{{ STATUS[p.status].n }}</el-tag></div>
           <p>{{ p.content?.summary }}</p>
           <div class="sw-muted">

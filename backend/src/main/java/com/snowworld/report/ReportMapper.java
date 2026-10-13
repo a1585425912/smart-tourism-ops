@@ -42,21 +42,27 @@ public interface ReportMapper {
 
     @Select("""
             <script>
-            SELECT """ + LIST_COLUMNS + """
+            SELECT
+            """ + LIST_COLUMNS + """
             FROM operation_report r JOIN scenic_site s ON s.id = r.site_id LEFT JOIN app_user u ON u.id = r.created_by
             WHERE r.site_id IN <foreach collection="siteIds" item="i" open="(" separator="," close=")">#{i}</foreach>
+            <if test="reportDate != null"> AND r.report_date = #{reportDate}</if>
+            <if test="latestOnly"> AND r.version = (SELECT max(v.version) FROM operation_report v WHERE v.site_id=r.site_id AND v.report_date=r.report_date)</if>
             ORDER BY r.report_date DESC, r.site_id, r.version DESC LIMIT #{limit} OFFSET #{offset}
             </script>
             """)
-    List<ReportRow> list(@Param("siteIds") List<Long> siteIds, @Param("limit") int limit, @Param("offset") int offset);
+    List<ReportRow> list(@Param("siteIds") List<Long> siteIds, @Param("limit") int limit, @Param("offset") int offset,
+                         @Param("latestOnly") boolean latestOnly, @Param("reportDate") LocalDate reportDate);
 
     @Select("""
             <script>
             SELECT count(*) FROM operation_report r
             WHERE r.site_id IN <foreach collection="siteIds" item="i" open="(" separator="," close=")">#{i}</foreach>
+            <if test="reportDate != null"> AND r.report_date = #{reportDate}</if>
+            <if test="latestOnly"> AND r.version = (SELECT max(v.version) FROM operation_report v WHERE v.site_id=r.site_id AND v.report_date=r.report_date)</if>
             </script>
             """)
-    long count(@Param("siteIds") List<Long> siteIds);
+    long count(@Param("siteIds") List<Long> siteIds, @Param("latestOnly") boolean latestOnly, @Param("reportDate") LocalDate reportDate);
 
     @Select("SELECT " + LIST_COLUMNS + """
             , r.snapshot, r.content
@@ -74,9 +80,9 @@ public interface ReportMapper {
 
     @Insert("""
             INSERT INTO operation_report (site_id, report_date, version, title, snapshot, content, data_as_of, data_mode,
-                provider, model, prompt_version, agent_run_id, created_by)
+                provider, model, prompt_version, agent_run_id, created_by, created_at)
             VALUES (#{siteId}, #{reportDate}, #{version}, #{title}, #{snapshot}, #{content}, #{dataAsOf}, #{dataMode},
-                #{provider}, #{model}, #{promptVersion}, #{agentRunId}, #{createdBy})
+                #{provider}, #{model}, #{promptVersion}, #{agentRunId}, #{createdBy}, coalesce(#{createdAt}, now()))
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
     void insert(ReportRow row);

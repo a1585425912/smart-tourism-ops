@@ -106,10 +106,11 @@ function openScreen() {
         <el-select
           v-if="app.sites.length"
           class="site-select"
-          :model-value="app.currentSite?.id"
+          :model-value="app.isGlobal ? 0 : app.currentSite?.id"
           placeholder="选择景区"
           @update:model-value="(v: number) => app.selectSite(v)"
         >
+          <el-option label="全局（全部授权景区）" :value="0" />
           <el-option v-for="s in app.sites" :key="s.id" :label="s.name" :value="s.id" />
         </el-select>
         <span v-else class="sw-muted">暂无授权景区</span>

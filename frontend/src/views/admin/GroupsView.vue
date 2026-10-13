@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GlobalScopeView from '@/components/admin/GlobalScopeView.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import type { EChartsOption } from 'echarts'
 import { opsApi, type TourGroup } from '@/api/ops'
@@ -65,7 +66,8 @@ const dailyOption = computed<EChartsOption | null>(() => {
 </script>
 
 <template>
-  <div class="sw-page">
+  <GlobalScopeView v-if="app.isGlobal" kind="groups" />
+  <div v-else class="sw-page">
     <div class="bar">
       <h2>旅行社与团队</h2>
       <el-radio-group v-model="days" size="small">

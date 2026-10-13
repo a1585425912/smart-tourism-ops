@@ -6,6 +6,8 @@ import com.snowworld.common.ApiException;
 import com.snowworld.common.PageResult;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,14 +41,16 @@ public class ReportController {
     @PreAuthorize("hasAuthority('REPORT_READ')")
     public PageResult<ReportMapper.ReportRow> list(@RequestParam(required = false) List<Long> siteId,
                                                    @RequestParam(required = false) Integer page,
-                                                   @RequestParam(required = false) Integer size) {
+                                                   @RequestParam(required = false) Integer size,
+                                                   @RequestParam(defaultValue = "false") boolean latestOnly,
+                                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate reportDate) {
         List<Long> sites = scope.resolve(siteId);
         int p = PageResult.clampPage(page);
         int s = PageResult.clampSize(size);
         if (sites.isEmpty()) {
             return new PageResult<>(List.of(), 0, p, s);
         }
-        return new PageResult<>(mapper.list(sites, s, PageResult.offset(p, s)), mapper.count(sites), p, s);
+        return new PageResult<>(mapper.list(sites, s, PageResult.offset(p, s), latestOnly, reportDate), mapper.count(sites, latestOnly, reportDate), p, s);
     }
 
     @GetMapping("/{id}")

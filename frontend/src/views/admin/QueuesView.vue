@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GlobalScopeView from '@/components/admin/GlobalScopeView.vue'
 import { computed, onBeforeUnmount, onMounted } from 'vue'
 import type { EChartsOption } from 'echarts'
 import { flowApi, type QueueStatus } from '@/api/flow'
@@ -40,7 +41,8 @@ function spark(q: QueueStatus): EChartsOption | null {
 </script>
 
 <template>
-  <div class="sw-page">
+  <GlobalScopeView v-if="app.isGlobal" kind="queues" />
+  <div v-else class="sw-page">
     <div class="head">
       <h2>排队时长</h2>
       <span class="sw-muted">“估计”由排队人数 ÷ 服务能力推算，“实测”来自现场测量；二者分开展示，没有数据时显示暂无数据</span>

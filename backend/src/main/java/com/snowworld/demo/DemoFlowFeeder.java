@@ -105,7 +105,7 @@ public class DemoFlowFeeder {
                     windowStart = date.atStartOfDay(ClockConfig.BIZ_ZONE).toOffsetDateTime();
                 }
                 boolean hourly = date.isBefore(today.minusDays(1)) && fromSlot % 6 == 0;
-                boolean zones = !date.isBefore(today.minusDays(ZONE_HISTORY_DAYS));
+                boolean zones = !date.isBefore(LocalDate.parse(props.demo().historyFrom()));
                 emitDay(site, date, fromSlot, toSlot, hourly, zones, records);
             }
             if (records.isEmpty()) {
@@ -116,6 +116,22 @@ public class DemoFlowFeeder {
                 ingest.rebuildAggregates(site.id(), windowStart, now);
                 log.info("演示客流回灌 {}: {} 条事件", site.code(), records.size());
             }
+        }
+    }
+
+    /** 补齐此前短窗口遗漏的区域与排队历史，客流增量沿用现有时间片，避免重复累计。 */
+    public synchronized void syncDetails(LocalDate from) {
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        for (Site site : loadSites()) {
+            for (LocalDate day = from; !day.isAfter(now.toLocalDate()); day = day.plusDays(1)) {
+                List<FlowRecord> records = new ArrayList<>();
+                int end = day.equals(now.toLocalDate()) ? (now.getHour()*60+now.getMinute())/10 : DemoFlowModel.SLOTS;
+                emitDay(site, day, 0, end, true, true, records);
+                boolean closed = !model.inSeason(site.code(), day);
+                if (!closed) records.removeIf(r -> r.deviceId() == null && r.zoneId() == null);
+                ingest.ingest(site.sourceId(), "DEMO", records, false);
+            }
+            ingest.rebuildAggregates(site.id(), from.atStartOfDay(ClockConfig.BIZ_ZONE).toOffsetDateTime(), now);
         }
     }
 
@@ -133,6 +149,21 @@ public class DemoFlowFeeder {
                          List<FlowRecord> out) {
         DemoFlowModel.DayCurve curve = model.curve(site.code(), date);
         if (curve == null) {
+            int step = hourly ? 6 : 1;
+            for (int s=fromSlot; s<toSlot; s+=step) {
+                OffsetDateTime at=slotTime(date,Math.min(s+step,toSlot)-1);
+                String tag=(hourly?"H:":"T:")+"C:"+slotTime(date,s).toEpochSecond()/60;
+                out.add(record("ENTRY:"+tag,site,null,null,"ENTRY",0,slotTime(date,s)));
+                out.add(record("EXIT:"+tag,site,null,null,"EXIT",0,slotTime(date,s)));
+                out.add(record("IN_PARK:"+tag,site,null,null,"IN_PARK",0,at));
+                if (!withZones) continue;
+                for (Zone zone:site.zones()) out.add(record("Z"+zone.id()+":"+tag,site,zone.id(),null,"ZONE_COUNT",0,at));
+                for (QueuePoint q:site.queues()) {
+                    Long zone=site.zones().get(q.zoneIndex()).id();
+                    out.add(record("QL"+q.deviceId()+":"+tag,site,zone,q.deviceId(),"QUEUE_LEN",0,at));
+                    if(q.measured()) out.add(record("QW"+q.deviceId()+":"+tag,site,zone,q.deviceId(),"QUEUE_WAIT",0,at));
+                }
+            }
             return;
         }
         int[] capacities = site.zones().stream().mapToInt(Zone::capacity).toArray();
@@ -159,9 +190,6 @@ public class DemoFlowFeeder {
             for (int i = 0; i < counts.length; i++) {
                 out.add(record("Z" + site.zones().get(i).id() + ":" + tag, site, site.zones().get(i).id(), null,
                         "ZONE_COUNT", counts[i], stockAt));
-            }
-            if (hourly) {
-                continue;
             }
             for (QueuePoint q : site.queues()) {
                 long len = model.queueLength(site.code(), date, end, counts[q.zoneIndex()], q.ordinal());

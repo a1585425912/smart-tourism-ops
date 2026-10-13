@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GlobalScopeView from '@/components/admin/GlobalScopeView.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { scenicApi } from '@/api/core'
@@ -175,7 +176,8 @@ const mapSites = computed(() => (site.data.value ? [site.data.value] : []))
 </script>
 
 <template>
-  <div class="sw-page">
+  <GlobalScopeView v-if="app.isGlobal" kind="sites" />
+  <div v-else class="sw-page">
     <div class="sw-card">
       <div class="sw-card-title">
         <span>景区资料</span>

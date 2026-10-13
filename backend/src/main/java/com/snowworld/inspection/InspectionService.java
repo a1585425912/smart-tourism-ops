@@ -360,7 +360,8 @@ public class InspectionService {
     }
 
     private static boolean executorOnly(AuthUser user) {
-        return !user.has(Permission.INSPECTION_MANAGE) && !user.has(Permission.INSPECTION_REVIEW);
+        return user.has(Permission.INSPECTION_EXECUTE)
+                && !user.has(Permission.INSPECTION_MANAGE) && !user.has(Permission.INSPECTION_REVIEW);
     }
 
     private TaskDetail detail(InspectionMapper.TaskRow t, AuthUser user) {

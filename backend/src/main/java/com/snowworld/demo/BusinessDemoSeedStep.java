@@ -48,7 +48,8 @@ public class BusinessDemoSeedStep implements DemoSeedStep {
 
     @Override
     public boolean alreadySeeded(DemoSeedContext ctx) {
-        return ctx.jdbc().sql("SELECT EXISTS (SELECT 1 FROM business_unit)").query(Boolean.class).single();
+        return ctx.jdbc().sql("SELECT EXISTS (SELECT 1 FROM business_daily WHERE biz_date = ?)")
+                .param(LocalDate.now(ctx.clock())).query(Boolean.class).single();
     }
 
     @Override
@@ -84,7 +85,7 @@ public class BusinessDemoSeedStep implements DemoSeedStep {
         long regionalMax = 1;
         for (Site s : sites) {
             Map<LocalDate, Long> m = new HashMap<>();
-            for (LocalDate d = today.minusDays(BUSINESS_DAYS); d.isBefore(today); d = d.plusDays(1)) {
+            for (LocalDate d = ctx.historyFrom(); !d.isAfter(today); d = d.plusDays(1)) {
                 long e = model.dailyEntries(s.code(), d);
                 m.put(d, e);
                 regionalMax = Math.max(regionalMax, regional.merge(d, e, Long::sum));
@@ -92,7 +93,7 @@ public class BusinessDemoSeedStep implements DemoSeedStep {
             entries.put(s.id(), m);
         }
         for (Unit u : units) {
-            for (LocalDate d = today.minusDays(BUSINESS_DAYS); d.isBefore(today); d = d.plusDays(1)) {
+            for (LocalDate d = ctx.historyFrom(); !d.isAfter(today); d = d.plusDays(1)) {
                 long siteEntries = entries.get(u.siteId()).get(d);
                 double noise = Math.exp(0.08 * rnd.nextGaussian());
                 BigDecimal revenue;
@@ -108,9 +109,6 @@ public class BusinessDemoSeedStep implements DemoSeedStep {
                     guests = (int) Math.round(orders * 1.8);
                     revenue = money(orders * u.price() * (1 + 0.4 * demand));
                 } else {
-                    if (siteEntries == 0) {
-                        continue;
-                    }
                     double base = siteEntries * u.factor() * noise;
                     if ("CATERING".equals(u.category())) {
                         guests = (int) Math.round(base);
@@ -124,6 +122,7 @@ public class BusinessDemoSeedStep implements DemoSeedStep {
                 ctx.jdbc().sql("""
                         INSERT INTO business_daily (unit_id, biz_date, revenue, orders, guests, occupancy, source_id, data_mode)
                         VALUES (?, ?, ?, ?, ?, ?, ?, 'DEMO')
+                        ON CONFLICT (unit_id, biz_date) DO NOTHING
                         """).params(u.id(), d, revenue, orders, guests, occupancy, businessSource).update();
             }
         }
@@ -137,7 +136,7 @@ public class BusinessDemoSeedStep implements DemoSeedStep {
         for (int i = 0; i < agencySpecs.length; i++) {
             long id = ctx.jdbc().sql("""
                     INSERT INTO travel_agency (code, name, license_no, region, contact_masked, data_mode)
-                    VALUES (?, ?, ?, ?, ?, 'DEMO') RETURNING id
+                VALUES (?, ?, ?, ?, ?, 'DEMO') ON CONFLICT (code) DO UPDATE SET code=excluded.code RETURNING id
                     """).params("TA%03d".formatted(i + 1), agencySpecs[i][0] + "（演示）", "L-DEMO-%05d".formatted(10000 + i * 37),
                     agencySpecs[i][1], "13%d****%04d".formatted(rnd.nextInt(10), rnd.nextInt(10000))).query(Long.class).single();
             agencies.add(new long[]{id, i});
@@ -147,7 +146,9 @@ public class BusinessDemoSeedStep implements DemoSeedStep {
         int seq = 0;
         for (Site s : sites) {
             int perGroup = "ZYDJ".equals(s.code()) ? 5000 : 1300;
-            for (LocalDate d = today.minusDays(GROUP_PAST_DAYS); !d.isAfter(today.plusDays(GROUP_FUTURE_DAYS)); d = d.plusDays(1)) {
+            for (LocalDate d = ctx.historyFrom(); !d.isAfter(today); d = d.plusDays(1)) {
+                if (ctx.jdbc().sql("SELECT EXISTS(SELECT 1 FROM tour_group WHERE site_id=? AND visit_date=?)")
+                        .params(s.id(), d).query(Boolean.class).single()) continue;
                 long e = model.dailyEntries(s.code(), d);
                 int groups = (int) Math.min(40, e / perGroup);
                 for (int g = 0; g < groups; g++) {
@@ -156,7 +157,7 @@ public class BusinessDemoSeedStep implements DemoSeedStep {
                     String status;
                     Integer entered = 0;
                     OffsetDateTime enteredAt = null;
-                    OffsetDateTime slot = d.atTime(9, 0).plusMinutes(g * 480L / Math.max(groups, 1)).atZone(DemoSeedContext.ZONE).toOffsetDateTime();
+                    OffsetDateTime slot = d.atTime("BXDSJ".equals(s.code()) ? 11 : 9, 0).plusMinutes(g * 480L / Math.max(groups, 1)).atZone(DemoSeedContext.ZONE).toOffsetDateTime();
                     if (rnd.nextInt(50) == 0) {
                         status = "CANCELLED";
                     } else if (slot.isBefore(now)) {
@@ -170,7 +171,7 @@ public class BusinessDemoSeedStep implements DemoSeedStep {
                             INSERT INTO tour_group (group_code, agency_id, site_id, visit_date, planned_size, entered_count, guide_name,
                                 guide_phone_masked, guide_cert_no, origin_region, status, entered_at, source_id, data_mode)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DEMO')
-                            """).params("G%s-%05d".formatted(d.toString().replace("-", ""), ++seq), agency[0], s.id(), d, planned, entered,
+                            """).params("DG%s-%d-%03d".formatted(d.toString().replace("-", ""), s.id(), g), agency[0], s.id(), d, planned, entered,
                             surnames.charAt(rnd.nextInt(surnames.length())) + "导",
                             "1%d%d****%04d".formatted(3 + rnd.nextInt(6), rnd.nextInt(10), rnd.nextInt(10000)),
                             "D-2301-****%02d".formatted(rnd.nextInt(100)),
@@ -189,16 +190,14 @@ public class BusinessDemoSeedStep implements DemoSeedStep {
                 "CHANNEL", new Object[][]{{"线上平台预订", .55}, {"旅行社团队", .20}, {"现场购票", .15}, {"年卡及其他", .05}, {"未知", .05}},
                 "STAY", new Object[][]{{"2小时以内", .15}, {"2-4小时", .45}, {"4-6小时", .25}, {"6小时以上", .08}, {"未知", .07}});
         for (Site s : sites) {
-            for (int back = 0; back < 6; back++) {
+            int months = (int) java.time.temporal.ChronoUnit.MONTHS.between(ctx.historyFrom().withDayOfMonth(1), today.withDayOfMonth(1));
+            for (int back = 0; back <= months; back++) {
                 LocalDate month = today.withDayOfMonth(1).minusMonths(back);
                 long monthEntries = 0;
                 for (LocalDate d = month; d.isBefore(month.plusMonths(1)) && d.isBefore(today); d = d.plusDays(1)) {
                     monthEntries += model.dailyEntries(s.code(), d);
                 }
-                if (monthEntries == 0) {
-                    continue;
-                }
-                double coverage = 0.55 + 0.03 * ((s.id() + back) % 5);
+                double coverage = monthEntries == 0 ? 0 : 0.55 + 0.03 * ((s.id() + back) % 5);
                 int sample = (int) (monthEntries * coverage);
                 for (var dim : dims.entrySet()) {
                     for (Object[] bucket : dim.getValue()) {
@@ -206,7 +205,8 @@ public class BusinessDemoSeedStep implements DemoSeedStep {
                         ctx.jdbc().sql("""
                                 INSERT INTO visitor_profile_stat (site_id, stat_month, dimension, bucket, visitors, sample_size, coverage, source_id, data_mode)
                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'DEMO')
-                                """).params(s.id(), month, dim.getKey(), bucket[0], (int) Math.max(1, sample * share), sample,
+                                ON CONFLICT (site_id, stat_month, dimension, bucket) DO NOTHING
+                                """).params(s.id(), month, dim.getKey(), bucket[0], (int) Math.max(0, sample * share), sample,
                                 BigDecimal.valueOf(coverage).setScale(4, RoundingMode.HALF_UP), profileSource).update();
                     }
                 }
@@ -245,7 +245,8 @@ public class BusinessDemoSeedStep implements DemoSeedStep {
                       int capacity, double factor, double price) {
         long id = ctx.jdbc().sql("""
                 INSERT INTO business_unit (site_id, code, name, category, location, capacity, data_mode)
-                VALUES (?, ?, ?, ?, CASE WHEN ?::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_Point(?::float8, ?::float8), 4326) END, ?, 'DEMO') RETURNING id
+                VALUES (?, ?, ?, ?, CASE WHEN ?::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_Point(?::float8, ?::float8), 4326) END, ?, 'DEMO')
+                ON CONFLICT (code) DO UPDATE SET code=excluded.code RETURNING id
                 """).params(siteId, code, name, category, lon, lon, lat, capacity == 0 ? null : capacity).query(Long.class).single();
         return new Unit(id, siteId, category, capacity, factor, price);
     }

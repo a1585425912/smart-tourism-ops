@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GlobalScopeView from '@/components/admin/GlobalScopeView.vue'
 import { computed, ref } from 'vue'
 import dayjs from 'dayjs'
 import type { EChartsOption } from 'echarts'
@@ -88,7 +89,8 @@ function reload() {
 </script>
 
 <template>
-  <div class="sw-page">
+  <GlobalScopeView v-if="app.isGlobal" kind="flows" />
+  <div v-else class="sw-page">
     <div class="bar">
       <el-radio-group v-model="preset" size="small">
         <el-radio-button value="today">今日</el-radio-button>

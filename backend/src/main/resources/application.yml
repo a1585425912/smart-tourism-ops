@@ -60,7 +60,7 @@ snow:
   demo:
     seed: ${SNOW_DEMO_SEED:false}
     replay-at: ${SNOW_DEMO_REPLAY_AT:}
-    history-from: 2024-01-01
+    history-from: ${SNOW_DEMO_HISTORY_FROM:2024-01-01}
     user-password: ${SNOW_DEMO_PASSWORD:}
   ai:
     provider: ${SNOW_AI_PROVIDER:fake}

@@ -40,6 +40,7 @@ function search() {
   else list.run()
 }
 watch(() => [q.sentiment, q.topic, q.status, q.complaint], search)
+watch([siteId, range], search)
 
 const sentimentOption = computed<EChartsOption | null>(() => {
   const by = summary.data.value?.bySentiment

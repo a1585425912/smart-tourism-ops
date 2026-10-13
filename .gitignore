@@ -1,0 +1,18 @@
+# 本地运行环境(便携数据库、Maven 仓库、上传文件), 由 scripts/setup 重新生成
+/runtime/
+
+# 构建产物
+target/
+node_modules/
+dist/
+*.log
+
+# 本地密钥与覆盖配置
+.env
+.env.local
+backend/config/
+
+# IDE
+.idea/
+.vscode/
+*.iml

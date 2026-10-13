@@ -1,0 +1,12 @@
+# 本地开发/演示环境: 连接 runtime/ 下的便携 PostgreSQL(仅监听 127.0.0.1), 启用演示数据与回放时钟。
+# 生产环境不要使用此 profile; 生产密码通过环境变量注入。
+spring:
+  datasource:
+    password: ${SNOW_DB_PASSWORD:snow_dev}
+
+snow:
+  demo:
+    seed: ${SNOW_DEMO_SEED:true}
+    # 冰雪季回放: 2026 春节假期(2/17 正月初一)下午, 界面会标注"演示回放"
+    replay-at: ${SNOW_DEMO_REPLAY_AT:2026-02-18T14:30:00+08:00}
+    user-password: ${SNOW_DEMO_PASSWORD:Snow@2026demo}

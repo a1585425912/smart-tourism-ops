@@ -22,7 +22,7 @@ import tools.jackson.databind.JsonNode;
 @AutoConfigureMockMvc
 @Import(AgentTestSupport.class)
 @TestPropertySource(properties = {"snow.ai.retry-backoff-ms=5", "snow.ai.provider=fake"})
-abstract class AgentTestBase extends IntegrationTestBase {
+public abstract class AgentTestBase extends IntegrationTestBase {
 
     @Autowired
     protected MockMvc mvc;
@@ -93,6 +93,14 @@ abstract class AgentTestBase extends IntegrationTestBase {
 
     protected static String limitations(AgentRunMapper.RunRow run) {
         return run.getResult().path("limitations").toString();
+    }
+
+    @Autowired
+    protected com.snowworld.common.SnowProperties props;
+
+    protected com.snowworld.demo.DemoSeedContext seedContext() {
+        return new com.snowworld.demo.DemoSeedContext(jdbc, props, java.time.Clock.systemDefaultZone(), new java.util.Random(7),
+                java.time.OffsetDateTime.now(), java.time.LocalDate.of(2024, 1, 1));
     }
 
     protected static JsonNode json(String s) {

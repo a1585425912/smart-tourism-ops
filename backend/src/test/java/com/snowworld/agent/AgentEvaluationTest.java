@@ -159,7 +159,7 @@ class AgentEvaluationTest extends AgentTestBase {
         assertThat(load(qa).getStatus()).isEqualTo("SUCCEEDED");
         assertThat(steps(qa)).extracting(AgentRunMapper.ToolCallRow::getToolName).doesNotContain("create_inspection_draft");
         assertThat(inspection.draftCalls).isEmpty();
-        assertThat(answer(load(qa))).doesNotContainPattern("1[3-9]\d{9}");
+        assertThat(answer(load(qa))).doesNotContainPattern("1[3-9]\\d{9}");
     }
 
     @Test

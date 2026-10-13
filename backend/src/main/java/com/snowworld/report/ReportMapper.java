@@ -66,8 +66,8 @@ public interface ReportMapper {
     ReportRow findById(long id);
 
     /** 同一景区同一天的报告串行生成版本号。 */
-    @Select("SELECT pg_advisory_xact_lock(hashtext('report:' || #{siteId} || ':' || #{date}))")
-    Object lock(@Param("siteId") long siteId, @Param("date") String date);
+    @Select("SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext('report:' || #{siteId} || ':' || #{date}))) t")
+    Integer lock(@Param("siteId") long siteId, @Param("date") String date);
 
     @Select("SELECT coalesce(max(version), 0) FROM operation_report WHERE site_id = #{siteId} AND report_date = #{date}")
     int maxVersion(@Param("siteId") long siteId, @Param("date") LocalDate date);

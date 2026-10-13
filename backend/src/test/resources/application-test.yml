@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: ${SNOW_TEST_DB_URL:jdbc:postgresql://localhost:55432/snow_test}
+    username: snow
+    password: ${SNOW_DB_PASSWORD:snow_dev}
+
+snow:
+  demo:
+    seed: false
+  ai:
+    provider: fake
+  job:
+    # 测试中手动驱动 worker, 避免后台线程干扰断言
+    enabled: false

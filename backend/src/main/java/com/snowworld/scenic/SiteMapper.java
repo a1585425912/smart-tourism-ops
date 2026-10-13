@@ -3,6 +3,7 @@ package com.snowworld.scenic;
 import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonRawValue;
 import lombok.Data;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
@@ -28,8 +29,10 @@ public interface SiteMapper {
         private String seasonNote;
         private String description;
         /** GeoJSON Point */
+        @JsonRawValue
         private String center;
         /** GeoJSON MultiPolygon */
+        @JsonRawValue
         private String boundary;
         private String boundarySrc;
         private String status;

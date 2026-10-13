@@ -16,3 +16,6 @@ backend/config/
 .idea/
 .vscode/
 *.iml
+
+# 并行开发用的 git worktree
+/.worktrees/

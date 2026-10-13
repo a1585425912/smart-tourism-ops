@@ -1,0 +1,33 @@
+/* 全局主题: 冰雪蓝。后台使用浅色, 大屏使用 .screen-root 深色变量。 */
+:root {
+  --sw-primary: #1f6feb;
+  --sw-primary-deep: #0b3d91;
+  --sw-ice: #5ec8f2;
+  --sw-bg: #f3f6fa;
+  --sw-panel: #ffffff;
+  --sw-border: #e3e8ef;
+  --sw-text-1: #1c2533;
+  --sw-text-2: #4a5568;
+  --sw-text-3: #8492a6;
+  --sw-ok: #2fa86b;
+  --sw-warn: #e6a23c;
+  --sw-danger: #e5484d;
+  --el-color-primary: #1f6feb;
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
+  color: var(--sw-text-1);
+  background: var(--sw-bg);
+}
+
+html, body, #app { margin: 0; height: 100%; }
+* { box-sizing: border-box; }
+
+.sw-card { background: var(--sw-panel); border: 1px solid var(--sw-border); border-radius: 8px; padding: 16px; }
+.sw-card-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+.sw-page { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.sw-grid { display: grid; gap: 16px; }
+.sw-muted { color: var(--sw-text-3); font-size: 12px; }
+.num { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 768px) {
+  .sw-page { padding: 12px; gap: 12px; }
+}

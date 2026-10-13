@@ -3,6 +3,7 @@ package com.snowworld.scenic;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonRawValue;
 import lombok.Data;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
@@ -22,6 +23,7 @@ public interface ZoneMapper {
         private String name;
         private String zoneType;
         /** GeoJSON Polygon, WGS84 */
+        @JsonRawValue
         private String boundary;
         private Integer capacity;
         private BigDecimal warnRatio;

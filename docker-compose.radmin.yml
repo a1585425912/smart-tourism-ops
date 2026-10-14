@@ -1,0 +1,5 @@
+# 可选 Radmin VPN 入口；默认部署不开放 18080。
+services:
+  app:
+    ports:
+      - "${RADMIN_BIND_IP:-127.0.0.1}:${RADMIN_PORT:-18080}:8080"

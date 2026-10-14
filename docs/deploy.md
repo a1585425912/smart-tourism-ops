@@ -26,6 +26,19 @@ docker compose logs -f app    # 看到 "Started SnowWorldApplication" 与演示�
 
 首次启动会自动建表（Flyway）并生成演示数据，约需 20–40 秒。演示数据都保存在 `pgdata` 卷里，重启不会重复生成。
 
+### Radmin VPN 远程演示
+
+主机和访问者先加入同一个 Radmin VPN 网络。在 `.env` 中填写主机的 Radmin VPN IPv4 地址和额外入口端口，例如：
+
+```dotenv
+RADMIN_BIND_IP=26.78.219.65
+RADMIN_PORT=18080
+```
+
+应用端口仍为 8080；新增入口转发到同一应用，访问者打开 `http://26.78.219.65:18080`，大屏为 `/screen`。示例 IP 请替换为实际主机地址。默认绑定 127.0.0.1，仅本机可访问。
+
+修改后执行 `docker compose up -d --no-deps app`。Windows 防火墙若拦截连接，在管理员 PowerShell 中运行 `./scripts/open-radmin-port.ps1`；脚本仅允许 Radmin VPN 接口和 26.0.0.0/8 来源访问该端口。需要关闭防火墙规则时运行 `Remove-NetFirewallRule -Name SnowWorld-Radmin-18080`。主机的 Radmin 地址变化后，应更新 `.env`、重新创建应用容器，并重新运行防火墙脚本。
+
 ### 常用操作
 
 ```bash
